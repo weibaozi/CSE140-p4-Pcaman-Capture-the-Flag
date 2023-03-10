@@ -1,0 +1,10 @@
+*.swp
+.DS_Store
+*.pyc
+__pycache__
+*.egg-info
+/dist/
+/html/
+/*.gif
+.github
+.history
