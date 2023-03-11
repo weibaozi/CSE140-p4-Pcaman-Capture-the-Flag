@@ -71,7 +71,8 @@ class CommonAgent(ReflexCaptureAgent):
 
     def getTreeDepth(self):
         return self.treeDepth
-
+    def getIndex(self):
+        return self.index
     def registerInitialState(self, gameState):
         """
         This method handles the initial setup of the agent and populates useful fields,
@@ -83,14 +84,17 @@ class CommonAgent(ReflexCaptureAgent):
         self.opponents = self.getOpponents(gameState)
         ghost = self.getGhostPosition(gameState)
         if self.index==1:
-
-            test_route= self.breadthFirstSearch(gameState, ghost[0])
-            print(test_route)
-        # Your initialization code goes here, if you need any.
+            test_route= self.breadthFirstSearch(gameState, (19,7),index=3)
+            print(test_route[1])
+    # Your initialization code goes here, if you need any.
     # board = 'both' means both pacman and ghost sides, 
     # 'pacman' means only pacman, 'ghost' means only ghost
-    def graphSearch(self, gameState, fringe,goal, board='both'):
-        fringe.push(Node(gameState.getAgentState(self.index).getPosition(),gameState=gameState))
+    #it will simulate the route, if the route is blocked by ghost, it will return false
+    def graphSearch(self, gameState, fringe,goal, board='both',index=None):
+        if index is None:
+            index=self.index
+        print("index", index)
+        fringe.push(Node(gameState.getAgentState(index).getPosition(),gameState=gameState))
         visited = []
         while not fringe.isEmpty():
             node = fringe.pop()
@@ -100,32 +104,32 @@ class CommonAgent(ReflexCaptureAgent):
                 return node.route()
             if node.coord not in visited:
                 visited.append(node.coord)
-                actions = gameState.getLegalActions(self.index)
-                successors = [self.getSuccessor(gameState, action) for action in actions]
+                actions = gameState.getLegalActions(index)
+                successors = [gameState.generateSuccessor(index,action) for action in actions]
                 for action, successor in zip(actions, successors):
                     if action == Directions.STOP:
                         continue
-                    #print("action, successor", action, successor.getAgentState(self.index).getPosition())
+                    #print("action, successor", action, successor.getAgentState(index).getPosition())
                     if board == 'ghost': 
-                        if successor.getAgentState(self.index).isPacman():
+                        if successor.getAgentState(index).isPacman():
                             continue
                     elif board == 'pacman':
-                        if not successor.getAgentState(self.index).isPacman():
+                        if not successor.getAgentState(index).isPacman():
                             continue
-                    successorPosition=gameState.getAgentState(self.index).getPosition() 
+                    successorPosition=gameState.getAgentState(index).getPosition() 
                     successorPosition=manual_move(successorPosition,action)
                     if successorPosition == goal:
                         route= node.route() + [action]
                         return (route,len(route))
                     fringe.push(
-                        Node(successor.getAgentState(self.index).getPosition(), 
+                        Node(successor.getAgentState(index).getPosition(), 
                              node, action, 1,successor))
         return []
-    def breadthFirstSearch(self,gameState, goal, board='both'):
+    def breadthFirstSearch(self,gameState, goal, board='both',index=None):
         """
         Search the shallowest nodes in the search tree first. [p 81]
         """
-        return self.graphSearch(gameState, Queue(), goal, board)
+        return self.graphSearch(gameState, Queue(), goal, board,index)
     # unused return a list of opponent position
     def getOpponentsPosition(self, gameState):
         return [gameState.getAgentPosition(opponent) for opponent in self.opponents]
@@ -164,7 +168,7 @@ class CommonAgent(ReflexCaptureAgent):
         test=[(a,v) for a, v in zip(actions, values) ]
         return random.choice(bestActions)
     def chooseAction(self, gameState):
-        return self.debug_chooseAction(gameState)
+        #return self.debug_chooseAction(gameState)
         return super().chooseAction(gameState)
         # if min of opp position is less than 10 doing alpha beta
         opponentsPosition = self.getOpponentsPosition(gameState)
@@ -343,7 +347,7 @@ class DefenseAgent(CommonAgent):
                 features['initial'] = self.getMazeDistance(myPos,(19,9) )
         ghostPosition = self.getGhostPosition(successor)
         if len(ghostPosition) > 1:
-            minDistance = min([self.getMazeDistance(myPos, ghost)
+            minDistance = min([self.breadthFirstSearch(gameState, ghost,board='ghost')
                               for ghost in ghostPosition])
             features['distanceToGhost'] = 1/minDistance * 10
         return features
