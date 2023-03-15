@@ -124,11 +124,14 @@ class CommonAgent(ReflexCaptureAgent):
         self.width = 0
         self.initialLocation = None
         self.state = None
-        self.debug = False
+        
         self.stopTimes=0
         self.friendAgent=None
         self.lastInvader=None
         self.trappedPacman=None
+        self.debug = False
+        self.debugHard=False
+        self.debugPosition=None
         print(index)
     # def advancedMazeDistance(self, gameState, start, end, side='both',opponents=[]):
     #     walls=gameState.getWalls()
@@ -229,6 +232,9 @@ class CommonAgent(ReflexCaptureAgent):
         if pacmanIndex == None or ghostIndexes == None:
             return False
         pacmanPosition = gameState.getAgentPosition(pacmanIndex)
+        pacmanActions=gameState.getLegalActions(pacmanIndex)
+        nextPacmanPositions = [gameState.generateSuccessor(pacmanIndex, action).getAgentPosition(pacmanIndex)
+                               for action in pacmanActions]            
         for ghost in ghostIndexes:
             nextGhostPosition= gameState.getAgentPosition(ghost)
             legalActions = gameState.getLegalActions(ghost)
@@ -241,11 +247,32 @@ class CommonAgent(ReflexCaptureAgent):
                 if p in result.visited:
                     num+=1
             if num == 1 and len(result.visited) < TrapSpace:
+                self.printd("pacman trapped")
+                return True
+            PacmanMoves=[p in nextGhostPositions for p in nextPacmanPositions]
+            if all(PacmanMoves):
+                self.printd("all in my action",PacmanMoves)
                 return True
         return False
-
+    def debug_chooseAction(self, gameState):
+        # goto debug position
+        actions = gameState.getLegalActions(self.index)
+        nextStates = [gameState.generateSuccessor(self.index, action)
+                      for action in actions]
+        values = [self.getMazeDistance(state.getAgentPosition(self.index), self.debugPosition)
+                   for state in nextStates]
+        best = min(values)
+        bestActions = [a for a, v in zip(actions, values) if v == best]
+        return random.choice(bestActions)
+        
     def chooseAction(self, gameState):
         # return self.debug_chooseAction(gameState)
+        if self.debugHard:
+            if self.debugPosition is not None:
+                return self.debug_chooseAction(gameState)
+            else:
+                return Directions.STOP
+        
         return super().chooseAction(gameState)
 
     def chooseAction_Pacman(self, gameState):
@@ -501,8 +528,11 @@ class DefenseAgent(CommonAgent):
         self.state = "start"
 
     def registerInitialState(self, gameState):
-        self.debug = True
-        return super().registerInitialState(gameState)
+        super().registerInitialState(gameState)
+        if self.index == 2:
+            self.debug = True
+            self.debugPosition=(13,7)
+        
     def chooseAction(self, gameState):
         scareTime = gameState.getAgentState(self.index).getScaredTimer()
         pacmanPosition = self.getPacmanPosition(gameState)
@@ -559,7 +589,6 @@ class DefenseAgent(CommonAgent):
         stateEval = sum(features[feature] * weights[feature]
                         for feature in features)
         if self.debug:
-
             print(action)
             for feature in features:
                 print(feature, ": {:.2f}".format(features[feature]), end=" ")
