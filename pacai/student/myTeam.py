@@ -1,18 +1,12 @@
-from pacai.util import reflection
-from pacai.agents.capture.capture import CaptureAgent
 import random
 from pacai.core.directions import Directions
-from pacai.core import distance
-from pacai.util.queue import Queue
 from pacai.agents.capture.reflex import ReflexCaptureAgent
 from pacai.core.search.position import PositionSearchProblem
 from pacai.util.priorityQueue import PriorityQueueWithFunction
-from pacai.core import distanceCalculator
-from pacai.agents.capture.defense import DefensiveReflexAgent
-import time
+
 ChaseDistance = 4  # chase distance
 OnDefenseMultiplier = 30
-SafeDistToAttack = 3  # keep this distance to ghost when trying to attack
+SafeDistToAttack = 2  # keep this distance to ghost when trying to attack
 SafeDistToScaredGhost = 3  # twice this distance is the lefter timer for scared ghost
 SafeDistToDefend = 2  # keep this distance to pacman when get scared
 TrapSpace = 25
@@ -189,16 +183,17 @@ class CommonAgent(ReflexCaptureAgent):
 
     def ghostScared(self, gameState):
         numAgents = gameState.getNumAgents()
-        return [gameState.getAgentState(i).getScaredTimer() > SafeDistToScaredGhost*2 for i in range(numAgents)]
+        return [gameState.getAgentState(i).getScaredTimer()
+                > SafeDistToScaredGhost * 2 for i in range(numAgents)]
 
     def getRange(self, isRed, side='both'):
         # get range of the game board:
-        half = self.width//2
+        half = self.width // 2
         if side == 'both':
-            return range(1, self.width-1)
+            return range(1, self.width - 1)
         elif side == 'pacman':
             if isRed:
-                return range(half, self.width-1)
+                return range(half, self.width - 1)
 
             else:
                 return range(1, half)
@@ -206,7 +201,7 @@ class CommonAgent(ReflexCaptureAgent):
             if isRed:
                 return range(1, half)
             else:
-                return range(half, self.width-1)
+                return range(half, self.width - 1)
 
         else:
             raise Exception('side should be one of [both, pacman, ghost]')
@@ -225,7 +220,8 @@ class CommonAgent(ReflexCaptureAgent):
         problem = PositionSearchProblem(gameState, goal=goal, start=start)
         ranges = self.getRange(
             (not self.isRed) if index in self.opponents else self.isRed, side)
-        return graphSearch(problem, PriorityQueueWithFunction(priorityFunction), ranges, opponents, hard=hard)
+        return graphSearch(problem, PriorityQueueWithFunction(priorityFunction),
+                           ranges, opponents, hard=hard)
 
     # unused return a list of opponent position
     def getOpponentsPosition(self, gameState):
@@ -233,12 +229,13 @@ class CommonAgent(ReflexCaptureAgent):
 
     def getNonScaredGhostPosition(self, gameState):
         return [gameState.getAgentPosition(opponent) for opponent in self.opponents
-                if not gameState.getAgentState(opponent).getScaredTimer() > SafeDistToScaredGhost*2
+                if not gameState.getAgentState(opponent).getScaredTimer()
+                > SafeDistToScaredGhost * 2
                 and not gameState.getAgentState(opponent).isPacman()]
 
     def getScaredGhostPosition(self, gameState):
         return [gameState.getAgentPosition(opponent) for opponent in self.opponents
-                if gameState.getAgentState(opponent).getScaredTimer() > SafeDistToScaredGhost*2
+                if gameState.getAgentState(opponent).getScaredTimer() > SafeDistToScaredGhost * 2
                 and not gameState.getAgentState(opponent).isPacman()]
 
     def getGhostPosition(self, gameState):
@@ -258,11 +255,12 @@ class CommonAgent(ReflexCaptureAgent):
                 if gameState.getAgentState(opponent).isPacman()]
 
     def isPacmanTrapped(self, gameState, pacmanIndex, ghostIndexes):
-        if pacmanIndex == None or ghostIndexes == None:
+        if pacmanIndex is None or ghostIndexes is None:
             return False
         pacmanPosition = gameState.getAgentPosition(pacmanIndex)
         pacmanActions = gameState.getLegalActions(pacmanIndex)
-        nextPacmanPositions = [gameState.generateSuccessor(pacmanIndex, action).getAgentPosition(pacmanIndex)
+        nextPacmanPositions = [gameState.generateSuccessor(pacmanIndex,
+                                                           action).getAgentPosition(pacmanIndex)
                                for action in pacmanActions]
         for ghost in ghostIndexes:
             nextGhostPosition = gameState.getAgentPosition(ghost)
@@ -288,7 +286,7 @@ class CommonAgent(ReflexCaptureAgent):
 
     def getSurround(self, position):
         x, y = position
-        tmp = [(x+1, y), (x-1, y), (x, y+1), (x, y-1)]
+        tmp = [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]
         result = []
         for p in tmp:
             if not self.walls[p[0]][p[1]]:
@@ -316,8 +314,6 @@ class CommonAgent(ReflexCaptureAgent):
         maxValue = max(values)
         # print([(a,v) for a,v in zip(actions,values)])
         return maxValue
-        # return 1/(min([self.getMazeDistance(gameState.getAgentPosition(self.index),opponentPosition) for opponentPosition in self.getOpponentsPosition(gameState)]))
-        return 0
 
 
 class OffenseAgent(CommonAgent):
@@ -327,21 +323,26 @@ class OffenseAgent(CommonAgent):
 
     def registerInitialState(self, gameState):
         super().registerInitialState(gameState)
-        if self.index == 0:
-            self.debugPosition = (23, 8)
-            self.debug = False
+        self.debugPosition = (23, 8)
+        self.debug = False
 
     def chooseAction(self, gameState):
 
         ghostPosition = self.getNonScaredGhostPosition(gameState)
-        capsulePosition = self.getCapsules(gameState)
         ghostMinDistance = 9999
         myPos = gameState.getAgentPosition(self.index)
 
         isPacman = gameState.getAgentState(self.index).isPacman()
+        nonScaredGhostIndex = [opponent for opponent in self.opponents
+                               if not gameState.getAgentState(opponent).getScaredTimer()
+                               > SafeDistToScaredGhost * 2
+                               and not gameState.getAgentState(opponent).isPacman()]
+        trapped = self.isPacmanTrapped(
+            gameState, self.index, nonScaredGhostIndex)
         self.isPacman = isPacman
         if len(ghostPosition) > 0:
-            ghostMinDistance = min([self.getMazeDistance(gameState.getAgentState(self.index).getPosition(), ghost)
+            ghostMinDistance = min([self.getMazeDistance(
+                                    gameState.getAgentState(self.index).getPosition(), ghost)
                                     for ghost in ghostPosition])
         if gameState.getAgentState(self.index).isPacman():
             self.isPacman = True
@@ -368,11 +369,15 @@ class OffenseAgent(CommonAgent):
         elif self.state == "chase":
             if len(self.getScaredGhostPosition(gameState)) > 0:
                 self.state = "power"
+            elif trapped:
+                self.state = "trapped"
             if not isPacman:
                 self.state = "defense"
             elif ghostMinDistance > ChaseDistance:
                 self.state = "attack"
-
+        elif self.state == "trapped":
+            if not trapped:
+                self.state = "attack"
         # power: after all ghost is not scared goto chase if ghost is near or goto attack
         elif self.state == "power":
             if len(self.getScaredGhostPosition(gameState)) == 0:
@@ -463,7 +468,7 @@ class OffenseAgent(CommonAgent):
             minDistance = min([self.getMazeDistance(myPos, pacman)
                               for pacman in pacmanPosition])
             features['distanceToPacman'] = minDistance
-        if friendPos != None:
+        if friendPos is not None:
             features['distanceToFriend'] = self.getMazeDistance(
                 myPos, friendPos)
 
@@ -472,7 +477,7 @@ class OffenseAgent(CommonAgent):
             features['RespawnLocation'] = 1
         # Stop and reverse check
         if (action == Directions.STOP):
-            features['stop'] = 1+self.stopTimes
+            features['stop'] = 1 + self.stopTimes
         rev = Directions.REVERSE[gameState.getAgentState(
             self.index).getDirection()]
         if (action == rev):
@@ -489,9 +494,8 @@ class OffenseAgent(CommonAgent):
             features['distanceToEscape'] = homeDistance
             if len(ghostPosition) > 0:
                 eatableFood = self.getEatableFood(gameState,
-                                                  min(ghostPosition, key=lambda x: self.getMazeDistance(myPos, x)))
+                            min(ghostPosition, key=lambda x: self.getMazeDistance(myPos, x)))
                 if len(eatableFood) > 0:
-                    #print("eatableFood", eatableFood)
                     minDistance = min([self.getMazeDistance(myPos, food)
                                        for food in eatableFood])
                     features['distanceToEatableFood'] = minDistance
@@ -500,7 +504,8 @@ class OffenseAgent(CommonAgent):
         elif self.state == "defense":
             pass
             if features['onDefense'] == 0:
-                features['distanceToGhostInverse'] *= 2
+                if 'distanceToGhostInverse' in features:
+                    features['distanceToGhostInverse'] *= 2
 
         return features
 
@@ -529,21 +534,21 @@ class OffenseAgent(CommonAgent):
         if self.state == "defense":
             stateWeight = {
                 'onDying': 0,
-                'reverse': -5,
+                'reverse': -10,
                 'Stop': -5,
                 'distanceToFood': -3,
                 'distanceToGhost': 1,
                 'distanceToPacman': -1,
                 'onDefense': -OnDefenseMultiplier,
                 'distanceToCapsule': -5,
-                'distanceToGhostInverse': -SafeDistToAttack*OnDefenseMultiplier,
+                'distanceToGhostInverse': -SafeDistToAttack * OnDefenseMultiplier,
                 'distanceToFriend': 2,
             }
         elif self.state == "attack":
             stateWeight = {
-
                 'distanceToCapsule': -0.5,
-                'numCapsules': 0
+                'numCapsules': 0,
+                'distanceToScaredGhost': 1,
             }
         elif self.state == "power":
             stateWeight = {
@@ -560,7 +565,17 @@ class OffenseAgent(CommonAgent):
                 'distanceToCapsule': -20,
                 'numCapsules': -1000,
                 'distanceToEscape': -1,
+                'distanceToGhost': 3,
+            }
+        elif self.state == "trapped":
+            stateWeight = {
+                'onDying': -0,
+                'distanceToEscape': -1,
+                'distanceToFood': -5,
                 'distanceToGhost': -3,
+                'distanceToCapsule': -6,
+                'numCapsules': -300,
+                'RespawnLocation': 1000,
             }
         offenseCommon.update(stateWeight)
         return offenseCommon
@@ -575,7 +590,7 @@ class DefenseAgent(CommonAgent):
     def registerInitialState(self, gameState):
         super().registerInitialState(gameState)
         if self.index == 3:
-            self.debug = True
+            self.debug = False
             self.debugPosition = None
 
     def chooseAction(self, gameState):
@@ -585,8 +600,8 @@ class DefenseAgent(CommonAgent):
         invaders = self.getPacmanIndex(gameState)
         minDistInvader = None
         if len(invaders) > 0:
-            minDistInvader = min(invaders, key=lambda x: self.getMazeDistance(myPos,
-                                                                              gameState.getAgentPosition(x)))
+            minDistInvader = min(invaders,
+                key=lambda x: self.getMazeDistance(myPos, gameState.getAgentPosition(x)))
             self.lastInvader = minDistInvader
             self.friendAgent.lastInvader = minDistInvader
         if self.state == "start":
@@ -690,8 +705,10 @@ class DefenseAgent(CommonAgent):
                 minDistance - SafeDistToDefend)
 
         if (len(foodList) > 0):
-            minDistance = min([self.UCS(successor, food, myPos, opponents=ghostPosition).cost
+            minDistance = min([self.getMazeDistance(myPos, food)
                               for food in foodList])
+            # minDistance = min([self.UCS(successor, food, myPos, opponents=ghostPosition).cost
+            #                   for food in foodList])
             features['distanceToMyFood'] = minDistance
 
         # if next local is respawn point and not by moving, then it is respawn
@@ -753,10 +770,4 @@ def createTeam(firstIndex, secondIndex, isRed,
     secondAgent = DefenseAgent(secondIndex, isRed)
     firstAgent.friendAgent = secondAgent
     secondAgent.friendAgent = firstAgent
-    #secondAgent = DefensiveReflexAgent(secondIndex)
-
     return [firstAgent, secondAgent]
-    return [
-        firstAgent(firstIndex),
-        secondAgent(secondIndex),
-    ]
